@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>坐与时代 | 世界著名椅子海报杂志</title>
+    <meta
+      name="description"
+      content="一份关于世界著名椅子的现代设计杂志风海报网页，收录 10 把设计史经典座椅的名称、历史与故事。"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="chairs-data.js" defer></script>
+    <script defer>
+      document.addEventListener("DOMContentLoaded", () => {
+        const data = window.CHAIR_ATLAS;
+
+        if (!data) {
+          document.body.innerHTML =
+            '<main class="load-error"><p>未加载到椅子数据，请确认 <code>chairs-data.js</code> 文件存在。</p></main>';
+          return;
+        }
+
+        const heroTitle = document.getElementById("hero-title");
+        const heroSubtitle = document.getElementById("hero-subtitle");
+        const heroDek = document.getElementById("hero-dek");
+        const heroMeta = document.getElementById("hero-meta");
+        const introLead = document.getElementById("intro-lead");
+        const introNote = document.getElementById("intro-note");
+        const outroSummary = document.getElementById("outro-summary");
+        const timelineList = document.getElementById("timeline-list");
+        const chairsList = document.getElementById("chairs-list");
+        const sourcesList = document.getElementById("sources-list");
+        const printButton = document.getElementById("print-button");
+        const missingButton = document.getElementById("missing-button");
+        const missingState = document.getElementById("missing-state");
+
+        const demoMissingSlugs = new Set(["red-blue-chair", "paimio-chair", "egg-chair"]);
+        const paletteCycle = [
+          { accent: "#bf4b2c", soft: "#f0d9c8", contrast: "#231a16" },
+          { accent: "#246058", soft: "#d6ebe8", contrast: "#132422" },
+          { accent: "#a57a2f", soft: "#f2e6c8", contrast: "#241b13" },
+          { accent: "#78594a", soft: "#eadfd8", contrast: "#211a17" },
+          { accent: "#375b87", soft: "#dce8f4", contrast: "#17202a" }
+        ];
+        let demoMissingEnabled = false;
+
+        heroTitle.textContent = data.issue.title_cn;
+        heroSubtitle.textContent = data.issue.title_en;
+        heroDek.textContent = data.issue.dek;
+        introLead.textContent = data.issue.intro;
+        introNote.textContent = data.issue.note;
+        outroSummary.textContent = data.issue.outro;
+
+        heroMeta.innerHTML = `
+          <div class="meta-block">
+            <span class="meta-label">卷别</span>
+            <strong>${escapeHtml(data.issue.edition)}</strong>
+          </div>
+          <div class="meta-block">
+            <span class="meta-label">收录</span>
+            <strong>${data.chairs.length} 把设计史名椅</strong>
+          </div>
+          <div class="meta-block">
+            <span class="meta-label">图片策略</span>
+            <strong>先排版，后替换公开图</strong>
+          </div>
+        `;
+
+        const chairOrder = [...data.chairs];
+
+        function escapeHtml(input) {
+          return String(input)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        }
+
+        function renderVisual(chair, palette) {
+          const isMissing = demoMissingEnabled && demoMissingSlugs.has(chair.slug);
+          const effectiveStatus = isMissing ? "missing" : chair.image_status;
+
+          if (effectiveStatus === "actual" && chair.image_path) {
+            return `
+              <figure class="chair-visual chair-visual--actual" style="--accent:${palette.accent}; --soft:${palette.soft};">
+                <img src="${escapeHtml(chair.image_path)}" alt="${escapeHtml(chair.name_cn)} 图片" loading="lazy" />
+                <figcaption>${escapeHtml(chair.image_credit || "图片来源待补充")}</figcaption>
+              </figure>
+            `;
+          }
+
+          if (effectiveStatus === "missing") {
+            return `
+              <div class="chair-visual chair-visual--missing" style="--accent:${palette.accent}; --soft:${palette.soft};">
+                <span class="chair-visual__state">Image missing</span>
+                <strong class="chair-visual__name">${escapeHtml(chair.name_en)}</strong>
+                <p class="chair-visual__note">当前未放入正式图片，版式仍保留图片位与署名位，方便后续替换。</p>
+                <span class="chair-visual__credit">${escapeHtml(chair.image_credit || "图片来源待补充")}</span>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="chair-visual chair-visual--placeholder" style="--accent:${palette.accent}; --soft:${palette.soft}; --contrast:${palette.contrast};">
+              <span class="chair-visual__state">Image placeholder</span>
+              <span class="chair-visual__year">${escapeHtml(chair.year)}</span>
+              <span class="chair-visual__serial">No.${String(chairOrder.indexOf(chair) + 1).padStart(2, "0")}</span>
+              <strong class="chair-visual__name">${escapeHtml(chair.name_en)}</strong>
+              <p class="chair-visual__note">后续替换为公开图或可授权图片</p>
+              <span class="chair-visual__credit">${escapeHtml(chair.image_credit || "图片来源待补充")}</span>
+            </div>
+          `;
+        }
+
+        function renderTimeline() {
+          timelineList.innerHTML = chairOrder
+            .map(
+              (chair) => `
+                <a class="timeline-link" href="#${escapeHtml(chair.slug)}">
+                  <span class="timeline-link__year">${escapeHtml(chair.year)}</span>
+                  <strong class="timeline-link__name">${escapeHtml(chair.name_cn)}</strong>
+                  <span class="timeline-link__designer">${escapeHtml(chair.designer)}</span>
+                </a>
+              `
+            )
+            .join("");
+        }
+
+        function renderChairs() {
+          chairsList.innerHTML = chairOrder
+            .map((chair, index) => {
+              const palette = paletteCycle[index % paletteCycle.length];
+              const refs = data.reference_library[chair.slug] || [];
+              const refsMarkup =
+                refs.length === 0
+                  ? '<span class="source-link is-muted">资料链接待补充</span>'
+                  : refs
+                      .map(
+                        (ref) =>
+                          `<a class="source-link" href="${escapeHtml(ref.url)}" target="_blank" rel="noreferrer">${escapeHtml(ref.label)}</a>`
+                      )
+                      .join("");
+
+              return `
+                <article id="${escapeHtml(chair.slug)}" class="chair-card" style="--accent:${palette.accent}; --soft:${palette.soft}; --delay:${index * 70}ms;">
+                  <div class="chair-card__visual-wrap">
+                    ${renderVisual(chair, palette)}
+                  </div>
+                  <div class="chair-card__content">
+                    <div class="chair-card__index">${String(index + 1).padStart(2, "0")}</div>
+                    <p class="chair-card__eyebrow">${escapeHtml(chair.country)} / ${escapeHtml(chair.year)}</p>
+                    <h2 class="chair-card__title">${escapeHtml(chair.name_cn)}</h2>
+                    <p class="chair-card__subtitle">${escapeHtml(chair.name_en)}</p>
+                    <div class="chair-card__meta-line">
+                      <span>设计师</span>
+                      <strong>${escapeHtml(chair.designer)}</strong>
+                    </div>
+                    <div class="chair-card__text-block">
+                      <span class="text-kicker">历史</span>
+                      <p>${escapeHtml(chair.history)}</p>
+                    </div>
+                    <div class="chair-card__text-block">
+                      <span class="text-kicker">故事</span>
+                      <p>${escapeHtml(chair.story)}</p>
+                    </div>
+                    <div class="chair-card__sources">
+                      <span class="text-kicker">参考</span>
+                      <div class="source-links">${refsMarkup}</div>
+                    </div>
+                  </div>
+                </article>
+              `;
+            })
+            .join("");
+        }
+
+        function renderSources() {
+          sourcesList.innerHTML = chairOrder
+            .map((chair) => {
+              const refs = data.reference_library[chair.slug] || [];
+              return `
+                <section class="reference-card">
+                  <p class="reference-card__name">${escapeHtml(chair.name_cn)}</p>
+                  <div class="reference-card__links">
+                    ${
+                      refs.length
+                        ? refs
+                            .map(
+                              (ref) =>
+                                `<a href="${escapeHtml(ref.url)}" target="_blank" rel="noreferrer">${escapeHtml(ref.label)}</a>`
+                            )
+                            .join("")
+                        : '<span class="is-muted">资料链接待补充</span>'
+                    }
+                  </div>
+                </section>
+              `;
+            })
+            .join("");
+        }
+
+        function syncMissingState() {
+          missingButton.setAttribute("aria-pressed", String(demoMissingEnabled));
+          missingButton.textContent = demoMissingEnabled ? "关闭缺图预览" : "预览缺图容错";
+          missingState.hidden = !demoMissingEnabled;
+        }
+
+        printButton.addEventListener("click", () => window.print());
+        missingButton.addEventListener("click", () => {
+          demoMissingEnabled = !demoMissingEnabled;
+          syncMissingState();
+          renderChairs();
+        });
+
+        renderTimeline();
+        renderChairs();
+        renderSources();
+        syncMissingState();
+        requestAnimationFrame(() => document.body.classList.add("is-ready"));
+      });
+    </script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <p class="hero__eyebrow">Poster Magazine / Design History Edition</p>
+        <div class="hero__grid">
+          <div class="hero__copy">
+            <h1 id="hero-title" class="hero__title"></h1>
+            <p id="hero-subtitle" class="hero__subtitle"></p>
+            <p id="hero-dek" class="hero__dek"></p>
+          </div>
+          <aside class="hero__aside">
+            <div id="hero-meta" class="hero__meta"></div>
+            <div class="hero__actions">
+              <button id="print-button" class="action-button" type="button">打印导出 PDF</button>
+              <button id="missing-button" class="action-button action-button--ghost" type="button">预览缺图容错</button>
+              <p id="missing-state" class="status-chip" hidden>缺图演示已开启：3 把椅子将显示缺图状态。</p>
+            </div>
+          </aside>
+        </div>
+      </header>
+
+      <main class="magazine">
+        <section class="section-block intro">
+          <div class="section-head">
+            <p class="section-head__index">01</p>
+            <div>
+              <h2>导语</h2>
+              <p class="section-head__en">Introduction</p>
+            </div>
+          </div>
+          <div class="intro__body">
+            <p id="intro-lead" class="intro__lead"></p>
+            <p id="intro-note" class="intro__note"></p>
+            <div class="legend-list">
+              <span class="legend-chip">正式图：后续替换</span>
+              <span class="legend-chip">占位图：当前默认</span>
+              <span class="legend-chip">缺图：可切换演示</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-block timeline">
+          <div class="section-head">
+            <p class="section-head__index">02</p>
+            <div>
+              <h2>时间线</h2>
+              <p class="section-head__en">Chronology</p>
+            </div>
+          </div>
+          <div id="timeline-list" class="timeline__list"></div>
+        </section>
+
+        <section class="section-block chairs">
+          <div class="section-head">
+            <p class="section-head__index">03</p>
+            <div>
+              <h2>名椅专题</h2>
+              <p class="section-head__en">Ten Chairs, Ten Turning Points</p>
+            </div>
+          </div>
+          <div id="chairs-list" class="chairs__list"></div>
+        </section>
+
+        <section class="section-block outro">
+          <div class="section-head">
+            <p class="section-head__index">04</p>
+            <div>
+              <h2>尾声与资料</h2>
+              <p class="section-head__en">Closing Notes & Sources</p>
+            </div>
+          </div>
+          <p id="outro-summary" class="outro__summary"></p>
+          <div id="sources-list" class="sources__list"></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
